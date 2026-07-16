@@ -1,0 +1,14 @@
+.DS_Store
+.vscode/
+build/
+out/
+waves/
+reports/
+*.fst
+*.vcd
+*.fsdb
+*.log
+*.jou
+*.wlf
+*.vvp
+obj_dir/
