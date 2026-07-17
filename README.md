@@ -1,12 +1,13 @@
 # RV32IM Out-of-Order CPU
 
-Personal RISC-V CPU implementation by XP Liu.
+An open, collaborative RISC-V CPU project initiated by XP Liu.
 
-This repository is a new engineering workspace for independently completing and
-evolving an RV32IM out-of-order core. It is intentionally separate from the
-original three-person ECE 411 repository. Only RTL files whose current tracked
-lines were authored entirely by XP Liu were retained; team-owned and mixed-
-authorship RTL was excluded and will be reimplemented here.
+This repository is a new engineering workspace for completing and evolving an
+RV32IM out-of-order core. It is intentionally separate from the original
+three-person ECE 411 repository. The initial RTL import contains only files whose
+tracked lines were authored entirely by XP Liu; team-owned and mixed-authorship
+RTL was excluded. All new work in this repository is collaborative and credited
+through its Git history and accepted pull requests.
 
 ## Current status
 
@@ -44,10 +45,35 @@ docs/        Architecture and source-boundary documentation
 
 See [the porting status](docs/PORTING_STATUS.md) for the exact retained and
 excluded modules, and [the architecture plan](docs/ARCHITECTURE_PLAN.md) for the
-personal rewrite sequence.
+collaborative implementation sequence.
+
+## Current priorities
+
+The first milestone is a reproducible, buildable RV32I foundation:
+
+1. define the new ISA and microarchitecture type package;
+2. add a pinned Verilator lint and simulation flow;
+3. add independent ALU and register-file unit tests;
+4. replace the Synopsys DesignWare multiply/divide dependency;
+5. document module interfaces before reconnecting the pipeline.
+
+The live task list is maintained in GitHub Issues. Tasks marked `status: ready`
+can be claimed without waiting for another design decision.
+
+## Contributing
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md), then select an unassigned Issue
+from the current milestone. Comment that you want to own it before writing code,
+keep the change focused, and open a pull request linked to the Issue. Larger
+interface or architecture changes begin with a design-proposal Issue.
+
+Project decisions and module ownership are described in
+[GOVERNANCE.md](GOVERNANCE.md). All participants must follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Public-release status
 
 No course handouts, staff testbenches, benchmark binaries, reports, group-owned
-RTL, or commercial tool scripts are included. A license has not yet been chosen,
-so no permission to copy or redistribute this repository is granted yet.
+RTL, or commercial tool scripts are included. A project license has not yet been
+chosen. Contributors must submit only work they have the right to contribute;
+the licensing decision is tracked as a project-governance Issue.

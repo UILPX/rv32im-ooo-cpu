@@ -1,0 +1,35 @@
+name: Design proposal
+description: Propose an interface, microarchitecture, or project-wide decision
+title: "[Design]: "
+labels:
+  - "type: design"
+  - "status: needs-decision"
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What decision is required, and what is blocked without it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed design
+      description: Include interfaces, state, ordering, reset, and failure behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and tradeoffs
+      description: Compare correctness, complexity, timing, area, and verification cost.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Explain how the decision will be tested or measured.
+    validations:
+      required: true
