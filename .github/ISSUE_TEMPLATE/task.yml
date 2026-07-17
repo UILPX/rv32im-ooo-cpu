@@ -1,0 +1,50 @@
+name: Implementation task
+description: A scoped RTL, verification, tooling, or documentation task
+title: "[Task]: "
+labels:
+  - "status: triage"
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Architecture and interfaces
+        - Build and CI
+        - Frontend and prediction
+        - Rename, scheduling, and commit
+        - Execute units
+        - Memory system
+        - Verification and formal
+        - Synthesis, timing, and PPA
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: State one concrete outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable conditions that mean the task is complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and risks
+      description: Link blocked decisions or related Issues.
+  - type: checkboxes
+    id: ownership
+    attributes:
+      label: Ownership
+      options:
+        - label: I checked for an existing Issue and will keep this change focused.
+          required: true

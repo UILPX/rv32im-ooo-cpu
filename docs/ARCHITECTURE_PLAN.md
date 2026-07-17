@@ -1,8 +1,10 @@
 # Personal architecture plan
 
-The target is an RV32IM out-of-order core implemented and verified entirely by
-XP Liu. The exact width and queue sizes should remain parameters or measured
-design choices rather than copied course constraints.
+The target is an RV32IM out-of-order core implemented and verified openly by the
+project contributors. The initial retained RTL is attributed to XP Liu; all new
+module ownership is recorded through Issues, reviews, and Git history. The exact
+width and queue sizes should remain parameters or measured design choices rather
+than copied course constraints.
 
 ## Planned dataflow
 
