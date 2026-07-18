@@ -12,10 +12,10 @@ new personal package and integration code are designed.
 - `memory/`: memory ordering, caches, and external-memory adaptation.
 - `core/`: top-level CPU composition.
 
-There is intentionally no compile manifest yet because the mixed-authorship type
-package was excluded and the retained modules cannot currently elaborate.
+There is intentionally no full-CPU compile manifest yet because pipeline control,
+memory macros, and top-level integration are still incomplete.
 
 `execute/mul_pipe.sv` and `execute/div_iterative.sv` are standalone and do not
-depend on the missing package. `mul_pipe.NUM_STAGES` controls multiplier latency
+depend on the CPU package. `mul_pipe.NUM_STAGES` controls multiplier latency
 (`NUM_STAGES - 1` cycles), while `div_iterative.DIV_CYC` sets the exact number
 of cycles used for a nonzero unsigned division.
