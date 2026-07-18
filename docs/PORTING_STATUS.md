@@ -18,14 +18,14 @@ system.
 | Area | Files | Follow-up required |
 | --- | --- | --- |
 | Common | `sp_ff_array.sv` | Add independent tests. |
-| Execute | `alu.sv`, `muldiv.sv`, `mul_pipe.sv`, `div_iterative.sv` | Open-source mul/div IP added and independently verified; reconnect to the future production type package. |
-| Backend | `bus_controller.sv`, `regfile.sv`, `reservation_station_branch.sv`, `reservation_station_simple.sv` | Reconnect to newly written personal interfaces and types. |
+| Execute | `alu.sv`, `muldiv.sv`, `mul_pipe.sv`, `div_iterative.sv` | Open-source mul/div IP and production type integration completed; add ALU integration tests. |
+| Backend | `bus_controller.sv`, `regfile.sv`, `reservation_station_branch.sv`, `reservation_station_simple.sv` | Production types defined; add independent unit and integration tests. |
 | Frontend | `i_fetch_ooo.sv` | Reconnect to a new fetch controller and predictor. |
-| Memory | `cacheline_adapter.sv`, `cache_ooo_bridge.sv`, `dcache.sv`, `icache.sv`, `icache_ooo.sv` | Define new memory interfaces and select one maintained I-cache path. |
+| Memory | `cacheline_adapter.sv`, `cache_ooo_bridge.sv`, `dcache.sv`, `icache.sv`, `icache_ooo.sv` | Memory interfaces defined; select one maintained I-cache path and replace missing SRAM macros. |
 
-Several retained modules import `rv32im_types`. That mixed-authorship package was
-not copied, so these modules will not compile until a new personal package and
-interfaces are written.
+The mixed-authorship type package was not copied. A new personal
+`rtl/pkg/rv32im_types.sv` now defines the interfaces used by the retained RTL;
+missing pipeline modules and memory macros still prevent a complete CPU build.
 
 ## Intentionally excluded
 
