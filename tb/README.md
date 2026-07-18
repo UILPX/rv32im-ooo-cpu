@@ -12,3 +12,8 @@ The `execute/` tests cover the standalone multiplier and divider across their
 standard parameter matrix. They also verify the RV32M wrapper with the production
 type package in `rtl/pkg/`. Run the full directed regression with `make
 test-muldiv`.
+
+`execute/alu_tb.sv` covers every currently supported ALU operation plus invalid
+operations, output backpressure, grant behavior, and flush. `backend/regfile_tb.sv`
+covers reset, the physical zero register, independent reads and writes, same-cycle
+bypass, and same-address write priority. Run both with `make test-unit`.
