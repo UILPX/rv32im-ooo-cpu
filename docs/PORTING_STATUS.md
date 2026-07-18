@@ -18,7 +18,7 @@ system.
 | Area | Files | Follow-up required |
 | --- | --- | --- |
 | Common | `sp_ff_array.sv` | Add independent tests. |
-| Execute | `alu.sv`, `muldiv.sv` | Replace the DesignWare multiplier/divider dependency. |
+| Execute | `alu.sv`, `muldiv.sv`, `mul_pipe.sv`, `div_iterative.sv` | Open-source mul/div IP added and independently verified; reconnect to the future production type package. |
 | Backend | `bus_controller.sv`, `regfile.sv`, `reservation_station_branch.sv`, `reservation_station_simple.sv` | Reconnect to newly written personal interfaces and types. |
 | Frontend | `i_fetch_ooo.sv` | Reconnect to a new fetch controller and predictor. |
 | Memory | `cacheline_adapter.sv`, `cache_ooo_bridge.sv`, `dcache.sv`, `icache.sv`, `icache_ooo.sv` | Define new memory interfaces and select one maintained I-cache path. |

@@ -4,7 +4,7 @@
 设计思路：
 1. 前端接口和普通 ALU 保持一致，直接吃 RS 给出的 issue_valid / issue_data。
 2. 乘法和除法各自维护一个写回 buffer，后面由 bus_controller 决定这拍是否接收。
-3. mul 用 DW_mult_pipe，div 用 DW_div_seq。
+3. mul 使用可调流水线的 mul_pipe，div 使用可调周期的 div_iterative。
 4. mul 和 div 可以并行在飞，因此后面分别输出 mul_wb / div_wb。
 5. 如果写回 buffer 还没被 bus_controller 取走，对应单元就不再接受新的同类指令。
 
@@ -21,7 +21,7 @@
 实现假设：
 1. issue_data.op 使用的是 RS_MUL 这组 op 编码。
 2. RS 只有在两个源操作数都 ready 时才会把指令送到这里。
-3. flush 到来时，已经在飞的结果可以直接丢掉；div 正在运行的硬件本体不强行中断，只是在完成后忽略结果。
+3. flush 到来时，乘除法内部状态和待写回结果都直接丢弃。
 */
 module muldiv
     import rv32im_types::*;
@@ -44,10 +44,9 @@ module muldiv
     input   logic       div_wb_grant
 );
 
-    localparam integer unsigned MUL_LATENCY = MUL_STAGES - 1;
+    localparam integer unsigned MUL_LATENCY = (MUL_STAGES > 0) ? MUL_STAGES - 1 : 0;
 
     typedef struct packed {
-        logic                       valid;
         logic   [4:0]               op;
         logic   [PHYS_REG_BITS-1:0] phy_rd;
         logic                       neg;
@@ -61,19 +60,18 @@ module muldiv
         logic                       neg_r;
     } div_meta_t;
 
-    mul_meta_t  mul_meta_q [MUL_LATENCY];
+    mul_meta_t  mul_meta_out;
     div_meta_t  div_meta_q;
 
     wb_bus_t    mul_wb_q, div_wb_q;
 
-    logic           mul_issue_fire;
     logic           div_issue_fire;
     logic           mul_issue_ready_int;
     logic           div_issue_ready_int;
 
-    logic           mul_pipe_en;
     logic           mul_done;
     logic           mul_buffer_can_take;
+    logic           mul_ip_output_valid;
     logic   [63:0]  mul_product_raw;
     logic   [63:0]  mul_product_fixed;
     logic   [31:0]  mul_a_mag;
@@ -83,12 +81,10 @@ module muldiv
     logic           mul_neg;
 
     logic           div_start;
-    logic           div_hold;
-    logic           div_busy_q;
-    logic           div_complete;
-    logic           div_done;
     logic           div_buffer_can_take;
     logic           div_finish;
+    logic           div_ip_input_ready;
+    logic           div_ip_output_valid;
     logic           div_is_signed;
     logic           div_special_zero;
     logic           div_special_overflow;
@@ -96,7 +92,7 @@ module muldiv
     logic   [31:0]  div_b_mag;
     logic           div_neg_q;
     logic           div_neg_r;
-    logic           div_divide_by_0;
+    logic           div_ip_divide_by_zero;
     logic   [31:0]  div_quotient_u;
     logic   [31:0]  div_remainder_u;
 
@@ -189,14 +185,9 @@ module muldiv
     assign mul_neg   = (mul_signed_a && issue_data.value_1[31]) ^
                        (mul_signed_b && issue_data.value_2[31]);
 
-    assign mul_done = mul_meta_q[MUL_LATENCY-1].valid;
-    assign mul_product_fixed = mul_meta_q[MUL_LATENCY-1].neg ? neg64(mul_product_raw) : mul_product_raw;
     assign mul_buffer_can_take = !mul_wb_q.valid || mul_wb_grant;
-
-    // 如果最老的乘法结果这拍已经到达最后一级，但写回 buffer 还没空出来，
-    // 就必须把整个乘法流水线停住，避免把结果顶丢。
-    assign mul_pipe_en = !(mul_done && !mul_buffer_can_take);
-    assign mul_issue_ready_int = mul_pipe_en;
+    assign mul_done = mul_ip_output_valid;
+    assign mul_product_fixed = mul_meta_out.neg ? neg64(mul_product_raw) : mul_product_raw;
 
     assign div_is_signed = (issue_data.op == OP_DIV) || (issue_data.op == OP_REM);
     assign div_special_zero = (issue_data.value_2 == 32'd0);
@@ -209,12 +200,7 @@ module muldiv
     assign div_neg_r = div_is_signed && issue_data.value_1[31];
 
     assign div_buffer_can_take = !div_wb_q.valid || div_wb_grant;
-    assign div_done = div_busy_q && div_complete;
-
-    // 对正常 divider 完成后的结果，如果写回 buffer 还没空，就用 hold 把 divider 停住。
-    // 如果这条除法因为 flush 被标成无效，就不必再等 buffer，直接在完成时丢掉即可。
-    assign div_hold = div_done && div_meta_q.valid && !div_buffer_can_take;
-    assign div_finish = div_done && (!div_meta_q.valid || div_buffer_can_take);
+    assign div_finish = div_ip_output_valid && div_buffer_can_take;
 
     always_comb begin
         issue_ready = 1'b0;
@@ -223,71 +209,92 @@ module muldiv
             if (is_mul_op(issue_data.op)) begin
                 issue_ready = mul_issue_ready_int;
             end else if (is_div_op(issue_data.op)) begin
-                issue_ready = !div_busy_q && div_issue_ready_int;
+                issue_ready = div_issue_ready_int;
             end
         end
     end
 
-    assign mul_issue_fire = issue_valid && issue_ready && is_mul_op(issue_data.op);
     assign div_issue_fire = issue_valid && issue_ready && is_div_op(issue_data.op);
-    assign div_issue_ready_int = div_buffer_can_take;
+    assign div_issue_ready_int = div_buffer_can_take && div_ip_input_ready;
 
     assign div_start = div_issue_fire && !div_special_zero && !div_special_overflow;
 
     // 乘法器这里用 unsigned 模式，把 mixed-sign / signed 的差异都放到 wrapper 里修正。
-    DW_mult_pipe #(
-        .a_width    (32),
-        .b_width    (32),
-        .num_stages (MUL_STAGES),
-        .stall_mode (1),
-        .rst_mode   (1)
+    mul_pipe #(
+        .WIDTH      (32),
+        .NUM_STAGES (MUL_STAGES)
     ) u_mul (
-        .clk        (clk),
-        .rst_n      (~rst),
-        .en         (mul_pipe_en),
-        .tc         (1'b0),
-        .a          (mul_issue_fire ? mul_a_mag : 32'd0),
-        .b          (mul_issue_fire ? mul_b_mag : 32'd0),
-        .product    (mul_product_raw)
+        .clk            (clk),
+        .rst            (rst),
+        .flush          (flush),
+        .input_valid    (issue_valid && is_mul_op(issue_data.op)),
+        .input_ready    (mul_issue_ready_int),
+        .input_a        (mul_a_mag),
+        .input_b        (mul_b_mag),
+        .output_valid   (mul_ip_output_valid),
+        .output_ready   (mul_buffer_can_take),
+        .output_product (mul_product_raw)
     );
 
     // 除法器固定用 unsigned 模式，signed 的输入输出都在 wrapper 里处理。
-    DW_div_seq #(
-        .a_width    (32),
-        .b_width    (32),
-        .tc_mode    (0),
-        .num_cyc    (DIV_CYC),
-        .rst_mode   (1),
-        .input_mode (1),
-        .output_mode(1)
+    div_iterative #(
+        .WIDTH   (32),
+        .DIV_CYC (DIV_CYC)
     ) u_div (
-        .clk        (clk),
-        .rst_n      (~rst),
-        .hold       (div_hold),
-        .start      (div_start),
-        .a          (div_a_mag),
-        .b          (div_b_mag),
-        .complete   (div_complete),
-        .divide_by_0(div_divide_by_0),
-        .quotient   (div_quotient_u),
-        .remainder  (div_remainder_u)
+        .clk                   (clk),
+        .rst                   (rst),
+        .flush                 (flush),
+        .input_valid           (div_start),
+        .input_ready           (div_ip_input_ready),
+        .input_dividend        (div_a_mag),
+        .input_divisor         (div_b_mag),
+        .output_valid          (div_ip_output_valid),
+        .output_ready          (div_buffer_can_take),
+        .output_quotient       (div_quotient_u),
+        .output_remainder      (div_remainder_u),
+        .output_divide_by_zero (div_ip_divide_by_zero)
     );
+
+    generate
+        if (MUL_LATENCY == 0) begin : gen_mul_meta_combinational
+            always_comb begin
+                mul_meta_out.op     = issue_data.op;
+                mul_meta_out.phy_rd = issue_data.phy_rd;
+                mul_meta_out.neg    = mul_neg;
+            end
+        end else begin : gen_mul_meta_pipeline
+            mul_meta_t mul_meta_q [MUL_LATENCY];
+
+            assign mul_meta_out = mul_meta_q[MUL_LATENCY-1];
+
+            always_ff @(posedge clk) begin
+                integer unsigned i;
+
+                if (rst || flush) begin
+                    for (i = 0; i < MUL_LATENCY; i = i + 1) begin
+                        mul_meta_q[i] <= '0;
+                    end
+                end else if (mul_issue_ready_int) begin
+                    for (i = MUL_LATENCY-1; i > 0; i = i - 1) begin
+                        mul_meta_q[i] <= mul_meta_q[i-1];
+                    end
+
+                    mul_meta_q[0].op     <= issue_data.op;
+                    mul_meta_q[0].phy_rd <= issue_data.phy_rd;
+                    mul_meta_q[0].neg    <= mul_neg;
+                end
+            end
+        end
+    endgenerate
 
     assign mul_wb = mul_wb_q;
     assign div_wb = div_wb_q;
 
     always_ff @(posedge clk) begin
-        integer unsigned i;
-
         if (rst) begin
             mul_wb_q <= '0;
             div_wb_q <= '0;
-            div_busy_q <= 1'b0;
             div_meta_q <= '0;
-
-            for (i = 0; i < MUL_LATENCY; i = i + 1) begin
-                mul_meta_q[i] <= '0;
-            end
         end else begin
             // 先处理写回 buffer；flush 时直接把当前准备写回的结果丢掉。
             if (flush) begin
@@ -303,8 +310,8 @@ module muldiv
 
                 if (mul_done && mul_buffer_can_take) begin
                     mul_wb_q <= make_wb(
-                        mul_meta_q[MUL_LATENCY-1].phy_rd,
-                        mul_result_select(mul_meta_q[MUL_LATENCY-1].op, mul_product_fixed)
+                        mul_meta_out.phy_rd,
+                        mul_result_select(mul_meta_out.op, mul_product_fixed)
                     );
                 end
 
@@ -318,7 +325,7 @@ module muldiv
                         issue_data.phy_rd,
                         div_overflow_result(issue_data.op)
                     );
-                end else if (div_finish && div_meta_q.valid) begin
+                end else if (div_finish && div_meta_q.valid && !div_ip_divide_by_zero) begin
                     if ((div_meta_q.op == OP_DIV) || (div_meta_q.op == OP_DIVU)) begin
                         div_wb_q <= make_wb(
                             div_meta_q.phy_rd,
@@ -333,40 +340,16 @@ module muldiv
                 end
             end
 
-            // 乘法元数据跟着 DW_mult_pipe 一起移动；flush 时把 valid 直接清空即可。
             if (flush) begin
-                for (i = 0; i < MUL_LATENCY; i = i + 1) begin
-                    mul_meta_q[i] <= '0;
-                end
-            end else if (mul_pipe_en) begin
-                for (i = MUL_LATENCY-1; i > 0; i = i - 1) begin
-                    mul_meta_q[i] <= mul_meta_q[i-1];
-                end
-
-                mul_meta_q[0].valid  <= mul_issue_fire;
-                mul_meta_q[0].op     <= issue_data.op;
-                mul_meta_q[0].phy_rd <= issue_data.phy_rd;
-                mul_meta_q[0].neg    <= mul_neg;
-            end
-
-            // 除法器不能像乘法一样随便丢 busy，因为 DW_div_seq 可能还在内部运行。
-            // flush 时只把这条 in-flight 除法标成“结果无效”，等 complete 后再把 busy 清掉。
-            if (flush) begin
-                if (div_busy_q) begin
-                    div_meta_q.valid <= 1'b0;
-                end else begin
-                    div_meta_q <= '0;
-                end
+                div_meta_q <= '0;
             end else begin
                 if (div_issue_fire && !div_special_zero && !div_special_overflow) begin
-                    div_busy_q <= 1'b1;
                     div_meta_q.valid  <= 1'b1;
                     div_meta_q.op     <= issue_data.op;
                     div_meta_q.phy_rd <= issue_data.phy_rd;
                     div_meta_q.neg_q  <= div_neg_q;
                     div_meta_q.neg_r  <= div_neg_r;
                 end else if (div_finish) begin
-                    div_busy_q <= 1'b0;
                     div_meta_q <= '0;
                 end
             end
