@@ -130,19 +130,11 @@ synth:
 
 synth-mul:
 	@mkdir -p $(YOSYS_DIR)
-	$(YOSYS) -q -l $(YOSYS_DIR)/mul-w$(WIDTH)-s$(MUL_STAGES).log -p \
-		'read_verilog -sv $(MUL_RTL); \
-		 chparam -set WIDTH $(WIDTH) -set NUM_STAGES $(MUL_STAGES) mul_pipe; \
-		 hierarchy -check -top mul_pipe; synth -top mul_pipe; check; stat; \
-		 write_json $(YOSYS_DIR)/mul-w$(WIDTH)-s$(MUL_STAGES).json'
+	$(YOSYS) -q -l $(YOSYS_DIR)/mul-w$(WIDTH)-s$(MUL_STAGES).log -p 'read_verilog -sv $(MUL_RTL); chparam -set WIDTH $(WIDTH) -set NUM_STAGES $(MUL_STAGES) mul_pipe; hierarchy -check -top mul_pipe; synth -top mul_pipe; check; stat; write_json $(YOSYS_DIR)/mul-w$(WIDTH)-s$(MUL_STAGES).json'
 
 synth-div:
 	@mkdir -p $(YOSYS_DIR)
-	$(YOSYS) -q -l $(YOSYS_DIR)/div-w$(WIDTH)-c$(DIV_CYC).log -p \
-		'read_verilog -sv $(DIV_RTL); \
-		 chparam -set WIDTH $(WIDTH) -set DIV_CYC $(DIV_CYC) div_iterative; \
-		 hierarchy -check -top div_iterative; synth -top div_iterative; check; stat; \
-		 write_json $(YOSYS_DIR)/div-w$(WIDTH)-c$(DIV_CYC).json'
+	$(YOSYS) -q -l $(YOSYS_DIR)/div-w$(WIDTH)-c$(DIV_CYC).log -p 'read_verilog -sv $(DIV_RTL); chparam -set WIDTH $(WIDTH) -set DIV_CYC $(DIV_CYC) div_iterative; hierarchy -check -top div_iterative; synth -top div_iterative; check; stat; write_json $(YOSYS_DIR)/div-w$(WIDTH)-c$(DIV_CYC).json'
 
 sweep-muldiv:
 	@set -e; for stages in $(MUL_STAGE_MATRIX); do \
