@@ -48,6 +48,11 @@ See [the porting status](docs/PORTING_STATUS.md) for the exact retained and
 excluded modules, and [the architecture plan](docs/ARCHITECTURE_PLAN.md) for the
 collaborative implementation sequence.
 
+New contributors should start with [the development setup](docs/DEVELOPMENT.md)
+and [the RTL interface conventions](docs/INTERFACES.md).
+Current ALU and register-file follow-up ideas are recorded in
+[the improvement proposals](docs/ALU_REGFILE_IMPROVEMENTS.md).
+
 ## Current priorities
 
 The first milestone is a reproducible, buildable RV32I foundation:
