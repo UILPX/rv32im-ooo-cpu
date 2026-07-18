@@ -8,11 +8,13 @@ feature count.
 
 1. Read `README.md`, `docs/ARCHITECTURE_PLAN.md`, and
    `docs/PORTING_STATUS.md`.
-2. Select an unassigned Issue labeled `status: ready`, or open a design proposal
+2. Set up the toolchain with `docs/DEVELOPMENT.md` and follow the contracts in
+   `docs/INTERFACES.md`.
+3. Select an unassigned Issue labeled `status: ready`, or open a design proposal
    if an interface or architecture decision is missing.
-3. Comment on the Issue before starting so a maintainer can assign it and avoid
+4. Comment on the Issue before starting so a maintainer can assign it and avoid
    duplicate work.
-4. Keep one Issue and one logical change per pull request whenever practical.
+5. Keep one Issue and one logical change per pull request whenever practical.
 
 The CPU is not buildable yet. Until the initial tool flow lands, describe any
 manual checks precisely and never report tests that were not run.

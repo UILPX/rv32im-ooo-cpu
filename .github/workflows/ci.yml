@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+env:
+  VERILATOR_APT_VERSION: 5.020-1
+  YOSYS_APT_VERSION: 0.33-5build2
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -19,17 +23,19 @@ concurrency:
 jobs:
   verify:
     name: Verilator and Yosys checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install HDL toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install --yes verilator yosys
+          sudo apt-get install --yes --no-install-recommends \
+            "verilator=${VERILATOR_APT_VERSION}" \
+            "yosys=${YOSYS_APT_VERSION}"
 
       - name: Run checks
-        run: make check
+        run: make ci
