@@ -79,7 +79,7 @@ lint-muldiv:
 
 $(SMOKE_BINARY): $(SMOKE_RTL) $(SMOKE_TB)
 	@mkdir -p $(VERILATOR_DIR)
-	$(VERILATOR) --binary --timing --assert --Wall --timescale 1ns/1ps \
+	$(VERILATOR) --binary --timing --assert --Wall -Wno-BLKSEQ --timescale 1ns/1ps \
 		--Mdir $(VERILATOR_DIR) --top-module $(SMOKE_TOP) \
 		$(SMOKE_RTL) $(SMOKE_TB)
 
@@ -88,7 +88,7 @@ test: $(SMOKE_BINARY)
 
 $(MUL_TEST_BINARY): $(MUL_RTL) $(MUL_TB)
 	@mkdir -p $(@D)
-	$(VERILATOR) --binary --timing --assert --Wall --timescale 1ns/1ps \
+	$(VERILATOR) --binary --timing --assert --Wall -Wno-BLKSEQ --timescale 1ns/1ps \
 		--Mdir $(MUL_TEST_DIR) --top-module mul_pipe_tb \
 		-GWIDTH=$(WIDTH) -GNUM_STAGES=$(MUL_STAGES) $(MUL_RTL) $(MUL_TB)
 
@@ -97,7 +97,7 @@ test-mul: $(MUL_TEST_BINARY)
 
 $(DIV_TEST_BINARY): $(DIV_RTL) $(DIV_TB)
 	@mkdir -p $(@D)
-	$(VERILATOR) --binary --timing --assert --Wall --timescale 1ns/1ps \
+	$(VERILATOR) --binary --timing --assert --Wall -Wno-BLKSEQ --timescale 1ns/1ps \
 		--Mdir $(DIV_TEST_DIR) --top-module div_iterative_tb \
 		-GWIDTH=$(WIDTH) -GDIV_CYC=$(DIV_CYC) $(DIV_RTL) $(DIV_TB)
 
@@ -106,7 +106,7 @@ test-div: $(DIV_TEST_BINARY)
 
 $(MULDIV_TEST_BINARY): $(MULDIV_TYPES) $(MULDIV_RTL) $(MULDIV_TB)
 	@mkdir -p $(@D)
-	$(VERILATOR) --binary --timing --assert --Wall --timescale 1ns/1ps \
+	$(VERILATOR) --binary --timing --assert --Wall -Wno-BLKSEQ --timescale 1ns/1ps \
 		--Mdir $(MULDIV_TEST_DIR) --top-module muldiv_tb \
 		-GMUL_STAGES=$(MUL_STAGES) -GDIV_CYC=$(DIV_CYC) \
 		$(MULDIV_TYPES) $(MULDIV_RTL) $(MULDIV_TB)
