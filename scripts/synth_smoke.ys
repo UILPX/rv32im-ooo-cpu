@@ -1,0 +1,11 @@
+read_verilog -sv rtl/common/sp_ff_array.sv
+hierarchy -check -top sp_ff_array
+
+proc
+opt
+memory
+opt
+check
+stat
+
+write_json build/yosys/sp_ff_array.json

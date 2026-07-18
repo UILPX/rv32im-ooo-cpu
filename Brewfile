@@ -1,0 +1,2 @@
+brew "verilator"
+brew "yosys"
