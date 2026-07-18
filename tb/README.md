@@ -9,6 +9,6 @@ ECE 411 staff testbench or benchmark artifacts.
 testbench is implemented.
 
 The `execute/` tests cover the standalone multiplier and divider across their
-standard parameter matrix. They also verify the RV32M wrapper with the minimal
-test-only package in `support/`. Run the full directed regression with
-`make test-muldiv`.
+standard parameter matrix. They also verify the RV32M wrapper with the production
+type package in `rtl/pkg/`. Run the full directed regression with `make
+test-muldiv`.

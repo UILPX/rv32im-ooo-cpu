@@ -36,13 +36,13 @@ module muldiv_tb #(
 
     always #5ns clk = ~clk;
 
-    function automatic logic is_mul(input logic [4:0] op);
+    function automatic logic is_mul(input uop_t op);
         return (op == OP_MUL) || (op == OP_MULH) ||
                (op == OP_MULHSU) || (op == OP_MULHU);
     endfunction
 
     task automatic issue_request(
-        input logic [4:0]               op,
+        input uop_t                      op,
         input logic [31:0]              a,
         input logic [31:0]              b,
         input logic [PHYS_REG_BITS-1:0] phy_rd
@@ -73,7 +73,7 @@ module muldiv_tb #(
     endtask
 
     task automatic wait_result(
-        input logic [4:0]               op,
+        input uop_t                      op,
         input logic [31:0]              expected_value,
         input logic [PHYS_REG_BITS-1:0] expected_phy_rd
     );
@@ -144,7 +144,7 @@ module muldiv_tb #(
     endtask
 
     task automatic run_case(
-        input logic [4:0]               op,
+        input uop_t                      op,
         input logic [31:0]              a,
         input logic [31:0]              b,
         input logic [31:0]              expected_value,

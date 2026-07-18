@@ -12,8 +12,8 @@ through its Git history and accepted pull requests.
 ## Current status
 
 **Personal rebuild in progress.** The repository is not yet a complete or
-buildable CPU. The shared type package, pipeline control, retirement path,
-top-level integration, and independent testbench still need new implementations.
+buildable CPU. Pipeline control, the retirement path, top-level integration,
+and a CPU-level testbench still need new implementations.
 This status is explicit so future results are not confused with the earlier team
 project.
 
@@ -34,7 +34,7 @@ experiments without vendor libraries.
 ```text
 rtl/
   common/    Small reusable RTL primitives
-  pkg/       New personal ISA and microarchitecture types (to be written)
+  pkg/       Personal ISA and microarchitecture types
   frontend/  Fetch, prediction, and instruction delivery
   backend/   Rename, dispatch, scheduling, register state, and retirement
   execute/   Integer and multiply/divide execution units
@@ -96,10 +96,9 @@ Generated files, synthesis logs, and JSON netlists are kept under `build/` and
 can be removed with `make clean`.
 
 The smoke flow exercises `rtl/common/sp_ff_array.sv`; the independent mul/div
-flow also tests and synthesizes `mul_pipe` and `div_iterative`. A test-only type
-package verifies the retained `muldiv` wrapper. This does **not** imply that the
-complete CPU builds: the production `rv32im_types` package and core integration
-are still missing.
+flow also tests and synthesizes `mul_pipe` and `div_iterative`. The wrapper tests
+use the production `rv32im_types` package. This does **not** imply that the
+complete CPU builds: pipeline control and core integration are still missing.
 
 ## Public-release status
 

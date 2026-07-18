@@ -24,7 +24,7 @@ module reservation_station_simple
     localparam integer unsigned COUNT_WIDTH = $clog2(DEPTH + 1);
 
     typedef struct packed {
-        logic   [4:0]               op;
+        uop_t                       op;
         logic   [PHYS_REG_BITS-1:0] phy_rd;
         logic   [PHYS_REG_BITS-1:0] phy_rs1;
         logic   [PHYS_REG_BITS-1:0] phy_rs2;

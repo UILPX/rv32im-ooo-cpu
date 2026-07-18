@@ -19,7 +19,7 @@
 2. OP_DIV / OP_DIVU / OP_REM / OP_REMU
 
 实现假设：
-1. issue_data.op 使用的是 RS_MUL 这组 op 编码。
+1. issue_data.op 使用 rv32im_types::uop_t 的 RV32M 编码。
 2. RS 只有在两个源操作数都 ready 时才会把指令送到这里。
 3. flush 到来时，乘除法内部状态和待写回结果都直接丢弃。
 */
@@ -47,14 +47,14 @@ module muldiv
     localparam integer unsigned MUL_LATENCY = (MUL_STAGES > 0) ? MUL_STAGES - 1 : 0;
 
     typedef struct packed {
-        logic   [4:0]               op;
+        uop_t                       op;
         logic   [PHYS_REG_BITS-1:0] phy_rd;
         logic                       neg;
     } mul_meta_t;
 
     typedef struct packed {
         logic                       valid;
-        logic   [4:0]               op;
+        uop_t                       op;
         logic   [PHYS_REG_BITS-1:0] phy_rd;
         logic                       neg_q;
         logic                       neg_r;
@@ -96,14 +96,14 @@ module muldiv
     logic   [31:0]  div_quotient_u;
     logic   [31:0]  div_remainder_u;
 
-    function automatic logic is_mul_op(input logic [4:0] op);
+    function automatic logic is_mul_op(input uop_t op);
         return (op == OP_MUL)  ||
                (op == OP_MULH) ||
                (op == OP_MULHSU) ||
                (op == OP_MULHU);
     endfunction
 
-    function automatic logic is_div_op(input logic [4:0] op);
+    function automatic logic is_div_op(input uop_t op);
         return (op == OP_DIV)  ||
                (op == OP_DIVU) ||
                (op == OP_REM)  ||
@@ -126,7 +126,7 @@ module muldiv
     endfunction
 
     function automatic logic [31:0] mul_result_select(
-        input logic [4:0]  op,
+        input uop_t         op,
         input logic [63:0] product
     );
         unique case (op)
@@ -151,7 +151,7 @@ module muldiv
     endfunction
 
     function automatic logic [31:0] div_special_result(
-        input logic [4:0]  op,
+        input uop_t         op,
         input logic [31:0] a
     );
         unique case (op)
@@ -166,7 +166,7 @@ module muldiv
     endfunction
 
     function automatic logic [31:0] div_overflow_result(
-        input logic [4:0] op
+        input uop_t op
     );
         unique case (op)
             OP_DIV: return 32'h8000_0000;
