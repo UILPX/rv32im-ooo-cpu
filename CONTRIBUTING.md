@@ -58,5 +58,7 @@ to review comments themselves so design reasoning remains visible.
 
 Submit only code and documentation you created or have permission to contribute.
 Identify any adapted source in the pull request and preserve its license and
-attribution. The repository does not yet have a project license; the maintainers
-will resolve that decision before accepting broad external contributions.
+attribution. Unless explicitly stated otherwise, an intentionally submitted
+contribution is provided under Apache-2.0, the same license as the project. Each
+contributor retains copyright in their contribution. No contributor license
+agreement is currently required.

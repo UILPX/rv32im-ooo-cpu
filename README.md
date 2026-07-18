@@ -108,6 +108,13 @@ complete CPU builds: pipeline control and core integration are still missing.
 ## Public-release status
 
 No course handouts, staff testbenches, benchmark binaries, reports, group-owned
-RTL, or commercial tool scripts are included. A project license has not yet been
-chosen. Contributors must submit only work they have the right to contribute;
-the licensing decision is tracked as a project-governance Issue.
+RTL, or commercial tool scripts are included. Contributors must submit only work
+they have the right to contribute and must preserve third-party attribution.
+
+## License
+
+Copyright 2026 XP Liu. This project is licensed under the
+[Apache License 2.0](LICENSE). Commercial and non-commercial redistribution is
+permitted under its terms. Distributions and derivative works must preserve the
+applicable copyright, license, and [NOTICE](NOTICE) attribution required by
+Section 4 of the license.
