@@ -17,7 +17,8 @@ DIV_CYC ?= 11
 MUL_STAGE_MATRIX := 1 2 4
 DIV_CYCLE_MATRIX := 1 2 4 8 11 16 32
 
-SMOKE_RTL := rtl/common/sp_ff_array.sv
+SMOKE_FILELIST := filelists/smoke.f
+SMOKE_RTL := $(file <$(SMOKE_FILELIST))
 SMOKE_TB := tb/smoke/sp_ff_array_tb.sv
 SMOKE_TOP := sp_ff_array_tb
 SMOKE_BINARY := $(VERILATOR_DIR)/V$(SMOKE_TOP)
@@ -93,7 +94,7 @@ doctor-pinned: doctor
 	esac
 
 lint:
-	$(VERILATOR) --lint-only --Wall --top-module sp_ff_array $(SMOKE_RTL)
+	$(VERILATOR) --lint-only --Wall --top-module sp_ff_array -f $(SMOKE_FILELIST)
 
 lint-muldiv:
 	$(VERILATOR) --lint-only --Wall --top-module mul_pipe \
@@ -105,11 +106,11 @@ lint-muldiv:
 		-GMUL_STAGES=$(MUL_STAGES) -GDIV_CYC=$(DIV_CYC) \
 		$(MULDIV_TYPES) $(MULDIV_RTL)
 
-$(SMOKE_BINARY): $(SMOKE_RTL) $(SMOKE_TB)
+$(SMOKE_BINARY): $(SMOKE_FILELIST) $(SMOKE_RTL) $(SMOKE_TB)
 	@mkdir -p $(VERILATOR_DIR)
 	$(VERILATOR) --binary --timing --assert --Wall -Wno-BLKSEQ --timescale 1ns/1ps \
 		--Mdir $(VERILATOR_DIR) --top-module $(SMOKE_TOP) \
-		$(SMOKE_RTL) $(SMOKE_TB)
+		-f $(SMOKE_FILELIST) $(SMOKE_TB)
 
 test: $(SMOKE_BINARY)
 	$(SMOKE_BINARY)
