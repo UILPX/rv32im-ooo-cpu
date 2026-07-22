@@ -66,5 +66,17 @@ make clean           remove generated build files
 Generated files are written below `build/` and are ignored by Git. If a build
 behaves unexpectedly after a tool upgrade, run `make clean` once and retry.
 
+## Source manifests and diagnostics
+
+`filelists/smoke.f` is the version-controlled source manifest for the standalone
+smoke flow. Both `make lint` and `make test` pass this manifest to Verilator, so
+local development and CI compile the same RTL sources. Manifest paths are
+relative to the repository root; add production smoke RTL there instead of
+duplicating source lists in the Makefile.
+
+Verilator diagnostics are written directly to the terminal and include the
+source path and line number. A lint or compile error returns a nonzero status,
+which causes both Make and GitHub Actions to fail at the offending command.
+
 Before opening a pull request, run `make check` and record the command and tool
 versions in the PR description.
