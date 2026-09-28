@@ -75,6 +75,16 @@ package rv32im_types;
         OP_REMU    = 6'd48
     } uop_t;
 
+    typedef enum logic [2:0] {
+        FU_INVALID = 3'd0,
+        FU_INT     = 3'd1,
+        FU_BRANCH  = 3'd2,
+        FU_MULDIV  = 3'd3,
+        FU_LOAD    = 3'd4,
+        FU_STORE   = 3'd5,
+        FU_SYSTEM  = 3'd6
+    } fu_class_t;
+
     localparam logic [6:0] op_b_lui     = 7'b0110111;
     localparam logic [6:0] op_b_auipc   = 7'b0010111;
     localparam logic [6:0] op_b_jal     = 7'b1101111;
@@ -91,7 +101,75 @@ package rv32im_types;
         xlen_t       pc;
         inst_t       inst;
         rvfi_order_t rvfi_order;
+        logic        pred_taken;
+        xlen_t       pred_pc;
     } fetch_inst_t;
+
+    typedef struct packed {
+        fetch_inst_t fetch;
+        uop_t        op;
+        fu_class_t   fu_class;
+        arch_reg_t   rs1;
+        arch_reg_t   rs2;
+        arch_reg_t   rd;
+        xlen_t       imm;
+        logic        uses_rs1;
+        logic        uses_rs2;
+        logic        writes_rd;
+        logic        bp_is_call;
+        logic        bp_is_return;
+        logic        illegal;
+    } decoded_uop_t;
+
+    typedef struct packed {
+        decoded_uop_t decoded;
+        phys_reg_t    phy_rs1;
+        phys_reg_t    phy_rs2;
+        phys_reg_t    phy_rd;
+        phys_reg_t    stale_phy_rd;
+        logic         ready_rs1;
+        logic         ready_rs2;
+        logic         allocates_rd;
+    } renamed_uop_t;
+
+    typedef struct packed {
+        renamed_uop_t renamed;
+        rob_tag_t     rob_tag;
+    } rob_uop_t;
+
+    typedef enum logic [3:0] {
+        EXC_INST_MISALIGNED  = 4'd0,
+        EXC_ILLEGAL          = 4'd2,
+        EXC_BREAKPOINT       = 4'd3,
+        EXC_LOAD_MISALIGNED  = 4'd4,
+        EXC_STORE_MISALIGNED = 4'd6,
+        EXC_ECALL_MMODE      = 4'd11,
+        EXC_NONE             = 4'd15
+    } exception_cause_t;
+
+    typedef struct packed {
+        logic             valid;
+        rob_tag_t         rob_tag;
+        logic             rd_write;
+        xlen_t            rd_value;
+        logic             mem_valid;
+        xlen_t            mem_addr;
+        logic [3:0]       mem_rmask;
+        logic [3:0]       mem_wmask;
+        xlen_t            mem_rdata;
+        xlen_t            mem_wdata;
+        logic             branch_valid;
+        logic             branch_taken;
+        xlen_t            branch_target;
+        logic             branch_mispredict;
+        logic             exception_valid;
+        exception_cause_t exception_cause;
+    } rob_complete_t;
+
+    typedef struct packed {
+        rob_uop_t      uop;
+        rob_complete_t result;
+    } rob_commit_t;
 
     typedef struct packed {
         uop_t      op;
@@ -184,4 +262,29 @@ package rv32im_types;
         xlen_t                            line_addr;
         logic [CACHE_LINE_BITS-1:0]       line_data;
     } cache_mem_resp_t;
+
+    typedef struct packed {
+        logic                               valid;
+        logic                               issued;
+        logic                               complete;
+        logic                               mem_write;
+        xlen_t                              line_addr;
+        logic [CACHE_LINE_BITS-1:0]         line_data;
+        logic [1:0]                         burst_count;
+
+        logic                               ic_wait_valid;
+        cache_req_kind_t                    ic_kind;
+        logic [CACHE_SET_BITS-1:0]          ic_set_idx;
+        logic [CACHE_WAY_BITS-1:0]          ic_fill_way;
+        logic [CACHE_MSHR_ID_BITS-1:0]      ic_mshr_id;
+        logic [ICACHE_PORTS-1:0]            ic_port_mask;
+        logic                               ic_critical;
+
+        logic                               dc_wait_valid;
+        cache_req_kind_t                    dc_kind;
+        logic [CACHE_SET_BITS-1:0]          dc_set_idx;
+        logic [CACHE_WAY_BITS-1:0]          dc_fill_way;
+        logic [CACHE_MSHR_ID_BITS-1:0]      dc_mshr_id;
+        logic                               dc_critical;
+    } cache_adapter_entry_t;
 endpackage : rv32im_types

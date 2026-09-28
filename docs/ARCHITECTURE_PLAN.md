@@ -26,12 +26,15 @@ than copied course constraints.
 1. Write a new ISA and microarchitecture type package from the public RISC-V
    specification and personal interface decisions.
 2. Add unit tests for the retained register file, ALU, queues, and cache adapters.
-3. Implement decode, RAT/RRAT, and free-list allocation from blank files.
-4. Implement the ROB and precise commit/recovery path.
-5. Implement dispatch and the missing general reservation station.
-6. Implement the LSQ and reconnect the personal cache/memory RTL.
-7. Implement fetch and branch prediction, then integrate the CPU top level.
-8. Add an open-source simulation, lint, synthesis, and continuous-integration
+3. Connect the completed RV32IM decoder, rename state, and ROB through a precise
+   commit/recovery controller.
+4. Connect the completed dispatch buffer/router to the independently tested
+   reservation stations and execution units.
+5. Implement the LSQ and connect it through the tested shared cache adapter to
+   the personal cache/memory RTL.
+6. Extend the implemented fetch and branch predictor with committed ROB updates,
+   then integrate the CPU top level.
+7. Add an open-source simulation, lint, synthesis, and continuous-integration
    flow with pinned tool versions.
 
 Each milestone should include directed tests and a short design note before

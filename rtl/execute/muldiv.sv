@@ -23,9 +23,7 @@
 2. RS 只有在两个源操作数都 ready 时才会把指令送到这里。
 3. flush 到来时，乘除法内部状态和待写回结果都直接丢弃。
 */
-module muldiv
-    import rv32im_types::*;
-#(
+module muldiv #(
     parameter integer unsigned MUL_STAGES = 2,
     parameter integer unsigned DIV_CYC    = 11
 ) (
@@ -34,28 +32,28 @@ module muldiv
     input   logic       flush,
 
     input   logic           issue_valid,
-    input   simple_issue_t  issue_data,
+    input   rv32im_types::simple_issue_t issue_data,
     output  logic           issue_ready,
 
-    output  wb_bus_t    mul_wb,
+    output  rv32im_types::wb_bus_t mul_wb,
     input   logic       mul_wb_grant,
 
-    output  wb_bus_t    div_wb,
+    output  rv32im_types::wb_bus_t div_wb,
     input   logic       div_wb_grant
 );
 
     localparam integer unsigned MUL_LATENCY = (MUL_STAGES > 0) ? MUL_STAGES - 1 : 0;
 
     typedef struct packed {
-        uop_t                       op;
-        logic   [PHYS_REG_BITS-1:0] phy_rd;
+        rv32im_types::uop_t     op;
+        rv32im_types::phys_reg_t phy_rd;
         logic                       neg;
     } mul_meta_t;
 
     typedef struct packed {
         logic                       valid;
-        uop_t                       op;
-        logic   [PHYS_REG_BITS-1:0] phy_rd;
+        rv32im_types::uop_t      op;
+        rv32im_types::phys_reg_t phy_rd;
         logic                       neg_q;
         logic                       neg_r;
     } div_meta_t;
@@ -63,7 +61,7 @@ module muldiv
     mul_meta_t  mul_meta_out;
     div_meta_t  div_meta_q;
 
-    wb_bus_t    mul_wb_q, div_wb_q;
+    rv32im_types::wb_bus_t mul_wb_q, div_wb_q;
 
     logic           div_issue_fire;
     logic           mul_issue_ready_int;
@@ -96,90 +94,91 @@ module muldiv
     logic   [31:0]  div_quotient_u;
     logic   [31:0]  div_remainder_u;
 
-    function automatic logic is_mul_op(input uop_t op);
-        return (op == OP_MUL)  ||
-               (op == OP_MULH) ||
-               (op == OP_MULHSU) ||
-               (op == OP_MULHU);
+    function automatic logic is_mul_op(input rv32im_types::uop_t op);
+        is_mul_op = (op == rv32im_types::OP_MUL)  ||
+                    (op == rv32im_types::OP_MULH) ||
+                    (op == rv32im_types::OP_MULHSU) ||
+                    (op == rv32im_types::OP_MULHU);
     endfunction
 
-    function automatic logic is_div_op(input uop_t op);
-        return (op == OP_DIV)  ||
-               (op == OP_DIVU) ||
-               (op == OP_REM)  ||
-               (op == OP_REMU);
+    function automatic logic is_div_op(input rv32im_types::uop_t op);
+        is_div_op = (op == rv32im_types::OP_DIV)  ||
+                    (op == rv32im_types::OP_DIVU) ||
+                    (op == rv32im_types::OP_REM)  ||
+                    (op == rv32im_types::OP_REMU);
     endfunction
 
     function automatic logic [31:0] abs32(input logic [31:0] x);
         if (x[31]) begin
-            return (~x + 32'd1);
+            abs32 = ~x + 32'd1;
+        end else begin
+            abs32 = x;
         end
-        return x;
     endfunction
 
     function automatic logic [31:0] neg32(input logic [31:0] x);
-        return (~x + 32'd1);
+        neg32 = ~x + 32'd1;
     endfunction
 
     function automatic logic [63:0] neg64(input logic [63:0] x);
-        return (~x + 64'd1);
+        neg64 = ~x + 64'd1;
     endfunction
 
     function automatic logic [31:0] mul_result_select(
-        input uop_t         op,
+        input rv32im_types::uop_t op,
         input logic [63:0] product
     );
         unique case (op)
-            OP_MUL:    return product[31:0];
-            OP_MULH:   return product[63:32];
-            OP_MULHSU: return product[63:32];
-            OP_MULHU:  return product[63:32];
-            default:   return 32'd0;
+            rv32im_types::OP_MUL:    mul_result_select = product[31:0];
+            rv32im_types::OP_MULH:   mul_result_select = product[63:32];
+            rv32im_types::OP_MULHSU: mul_result_select = product[63:32];
+            rv32im_types::OP_MULHU:  mul_result_select = product[63:32];
+            default:                 mul_result_select = 32'd0;
         endcase
     endfunction
 
-    function automatic wb_bus_t make_wb(
-        input logic [PHYS_REG_BITS-1:0] phy_rd,
-        input logic [31:0]              value
+    function automatic rv32im_types::wb_bus_t make_wb(
+        input rv32im_types::phys_reg_t phy_rd,
+        input logic [31:0]             value
     );
-        wb_bus_t tmp;
+        rv32im_types::wb_bus_t tmp;
         tmp = '0;
         tmp.valid = 1'b1;
         tmp.phy_rd = phy_rd;
         tmp.value = value;
-        return tmp;
+        make_wb = tmp;
     endfunction
 
     function automatic logic [31:0] div_special_result(
-        input uop_t         op,
+        input rv32im_types::uop_t op,
         input logic [31:0] a
     );
         unique case (op)
-            OP_DIV,
-            OP_DIVU: return 32'hffff_ffff;
+            rv32im_types::OP_DIV,
+            rv32im_types::OP_DIVU: div_special_result = 32'hffff_ffff;
 
-            OP_REM,
-            OP_REMU: return a;
+            rv32im_types::OP_REM,
+            rv32im_types::OP_REMU: div_special_result = a;
 
-            default: return 32'd0;
+            default: div_special_result = 32'd0;
         endcase
     endfunction
 
     function automatic logic [31:0] div_overflow_result(
-        input uop_t op
+        input rv32im_types::uop_t op
     );
         unique case (op)
-            OP_DIV: return 32'h8000_0000;
-            OP_REM: return 32'd0;
-            default: return 32'd0;
+            rv32im_types::OP_DIV: div_overflow_result = 32'h8000_0000;
+            rv32im_types::OP_REM: div_overflow_result = 32'd0;
+            default:              div_overflow_result = 32'd0;
         endcase
     endfunction
 
-    assign mul_signed_a = (issue_data.op == OP_MUL) ||
-                          (issue_data.op == OP_MULH) ||
-                          (issue_data.op == OP_MULHSU);
-    assign mul_signed_b = (issue_data.op == OP_MUL) ||
-                          (issue_data.op == OP_MULH);
+    assign mul_signed_a = (issue_data.op == rv32im_types::OP_MUL) ||
+                          (issue_data.op == rv32im_types::OP_MULH) ||
+                          (issue_data.op == rv32im_types::OP_MULHSU);
+    assign mul_signed_b = (issue_data.op == rv32im_types::OP_MUL) ||
+                          (issue_data.op == rv32im_types::OP_MULH);
     assign mul_a_mag = (mul_signed_a && issue_data.value_1[31]) ? abs32(issue_data.value_1) : issue_data.value_1;
     assign mul_b_mag = (mul_signed_b && issue_data.value_2[31]) ? abs32(issue_data.value_2) : issue_data.value_2;
     assign mul_neg   = (mul_signed_a && issue_data.value_1[31]) ^
@@ -189,7 +188,8 @@ module muldiv
     assign mul_done = mul_ip_output_valid;
     assign mul_product_fixed = mul_meta_out.neg ? neg64(mul_product_raw) : mul_product_raw;
 
-    assign div_is_signed = (issue_data.op == OP_DIV) || (issue_data.op == OP_REM);
+    assign div_is_signed = (issue_data.op == rv32im_types::OP_DIV) ||
+                           (issue_data.op == rv32im_types::OP_REM);
     assign div_special_zero = (issue_data.value_2 == 32'd0);
     assign div_special_overflow = div_is_signed &&
                                   (issue_data.value_1 == 32'h8000_0000) &&
@@ -263,25 +263,35 @@ module muldiv
                 mul_meta_out.neg    = mul_neg;
             end
         end else begin : gen_mul_meta_pipeline
-            mul_meta_t mul_meta_q [MUL_LATENCY];
+            rv32im_types::uop_t mul_op_q [MUL_LATENCY];
+            rv32im_types::phys_reg_t mul_phy_rd_q [MUL_LATENCY];
+            logic mul_neg_q [MUL_LATENCY];
 
-            assign mul_meta_out = mul_meta_q[MUL_LATENCY-1];
+            always_comb begin
+                mul_meta_out.op = mul_op_q[MUL_LATENCY-1];
+                mul_meta_out.phy_rd = mul_phy_rd_q[MUL_LATENCY-1];
+                mul_meta_out.neg = mul_neg_q[MUL_LATENCY-1];
+            end
 
             always_ff @(posedge clk) begin
                 integer unsigned i;
 
                 if (rst || flush) begin
                     for (i = 0; i < MUL_LATENCY; i = i + 1) begin
-                        mul_meta_q[i] <= '0;
+                        mul_op_q[i] <= rv32im_types::OP_INVALID;
+                        mul_phy_rd_q[i] <= '0;
+                        mul_neg_q[i] <= 1'b0;
                     end
                 end else if (mul_issue_ready_int) begin
                     for (i = MUL_LATENCY-1; i > 0; i = i - 1) begin
-                        mul_meta_q[i] <= mul_meta_q[i-1];
+                        mul_op_q[i] <= mul_op_q[i-1];
+                        mul_phy_rd_q[i] <= mul_phy_rd_q[i-1];
+                        mul_neg_q[i] <= mul_neg_q[i-1];
                     end
 
-                    mul_meta_q[0].op     <= issue_data.op;
-                    mul_meta_q[0].phy_rd <= issue_data.phy_rd;
-                    mul_meta_q[0].neg    <= mul_neg;
+                    mul_op_q[0] <= issue_data.op;
+                    mul_phy_rd_q[0] <= issue_data.phy_rd;
+                    mul_neg_q[0] <= mul_neg;
                 end
             end
         end
@@ -326,7 +336,8 @@ module muldiv
                         div_overflow_result(issue_data.op)
                     );
                 end else if (div_finish && div_meta_q.valid && !div_ip_divide_by_zero) begin
-                    if ((div_meta_q.op == OP_DIV) || (div_meta_q.op == OP_DIVU)) begin
+                    if ((div_meta_q.op == rv32im_types::OP_DIV) ||
+                        (div_meta_q.op == rv32im_types::OP_DIVU)) begin
                         div_wb_q <= make_wb(
                             div_meta_q.phy_rd,
                             div_meta_q.neg_q ? neg32(div_quotient_u) : div_quotient_u

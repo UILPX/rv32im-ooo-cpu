@@ -12,21 +12,21 @@ testable with an open-source toolchain.
 - Add ALU and register-file unit tests.
 - Replace or isolate the Synopsys DesignWare multiply/divide implementation.
 
-## v0.2 — Correct single-issue OoO RV32I core
+## v0.2 — Correct single-issue OoO RV32IM core
 
-Goal: execute and retire RV32I programs through a correctness-first OoO path.
+Goal: execute and retire RV32IM programs through a correctness-first OoO path.
 
-- Implement decode, RAT/RRAT, free list, ROB, dispatch, and the missing general
-  reservation station.
+- Connect the completed decoder, rename state, ROB, dispatch, and general
+  reservation station through execution and precise-control integration.
 - Add precise commit and branch recovery.
 - Use a simple memory model before introducing caches.
 - Add architectural commit tracing and differential checking.
+- Integrate the open multiply/divide unit with ROB-tagged completion.
 
 ## v0.3 — RV32IM memory system
 
 Goal: complete RV32IM and integrate an independently verified memory path.
 
-- Add the open multiply/divide implementation.
 - Implement LSQ ordering and store-to-load forwarding.
 - Select one maintained I-cache implementation and integrate the D-cache.
 - Run architectural and randomized regressions.
@@ -38,5 +38,5 @@ Goal: publish reproducible correctness, performance, area, and timing evidence.
 - Expand measured bottlenecks to a superscalar configuration.
 - Add branch prediction and performance counters.
 - Add formal properties and coverage reporting.
-- Add Yosys/OpenROAD synthesis and timing flows.
+- Keep the Yosys/OpenROAD flow electrically clean after extracted-RC routing.
 - Publish architecture, verification, and PPA reports tied to release commits.
