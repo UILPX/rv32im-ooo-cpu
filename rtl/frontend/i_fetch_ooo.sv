@@ -1,12 +1,27 @@
-module i_fetch_ooo import rv32im_types::*; #(
-    parameter       QUE_DEPTH = 8,
-    parameter       FETCH_ROB_DEPTH = 4
+module i_fetch_ooo #(
+    parameter integer unsigned QUE_DEPTH = 8,
+    parameter integer unsigned FETCH_ROB_DEPTH = 4,
+    parameter integer unsigned FETCH_WIDTH = 2,
+    parameter integer unsigned QUEUE_COUNT_WIDTH =
+        (QUE_DEPTH <= 1) ? 1 : $clog2(QUE_DEPTH + 1),
+    parameter logic [31:0] RESET_PC = 32'hAAAAA000,
+    parameter integer unsigned BP_PHT_ENTRIES = 128,
+    parameter integer unsigned BP_RAS_ENTRIES = 4
 ) (
     input   logic           clk,
     input   logic           rst,
 
     input   logic           flush,
     input   logic   [31:0]  new_pc,
+
+    input   logic           bp_update_valid,
+    input   logic   [31:0]  bp_update_pc,
+    input   logic           bp_update_is_cond_branch,
+    input   logic           bp_update_is_jalr,
+    input   logic           bp_update_is_call,
+    input   logic           bp_update_is_return,
+    input   logic           bp_update_taken,
+    input   logic   [31:0]  bp_update_target,
 
     output  logic   [31:0]  addr_0,
     output  logic   [3:0]   rmask_0,
@@ -19,14 +34,21 @@ module i_fetch_ooo import rv32im_types::*; #(
     input   logic           resp_1,
 
     output  logic   [1:0]   push_mask,
-    output  fetch_inst_t    push_data_0,
-    output  fetch_inst_t    push_data_1,
-    input   logic   [3:0]   queue_left
+    output  rv32im_types::fetch_inst_t push_data_0,
+    output  rv32im_types::fetch_inst_t push_data_1,
+    input   logic   [QUEUE_COUNT_WIDTH-1:0] queue_left
 );
 
-    localparam logic [31:0] RESET_PC = 32'hAAAAA000;
-    localparam integer ROB_PTR_W = $clog2(FETCH_ROB_DEPTH);
+    localparam integer ROB_PTR_W =
+        (FETCH_ROB_DEPTH <= 1) ? 1 : $clog2(FETCH_ROB_DEPTH);
     localparam integer ROB_CNT_W = ROB_PTR_W + 1;
+
+    if ((FETCH_WIDTH < 1) || (FETCH_WIDTH > 2) ||
+        (FETCH_ROB_DEPTH < FETCH_WIDTH) || (QUE_DEPTH < 2)) begin : gen_invalid_parameters
+        initial begin
+            $error("i_fetch_ooo requires 1 <= FETCH_WIDTH <= 2, FETCH_ROB_DEPTH >= FETCH_WIDTH, and QUE_DEPTH >= 2");
+        end
+    end
 
     logic   [31:0]  next_pc_q, next_pc_n;
     logic   [63:0]  next_order_q, next_order_n;
@@ -55,9 +77,6 @@ module i_fetch_ooo import rv32im_types::*; #(
 
     logic   [31:0]          rdata [2];
     logic   [1:0]           resp;
-    logic   [1:0]           issue;
-    logic   [31:0]          issue_addr [2];
-
     logic   [ROB_PTR_W-1:0] head_idx;
     logic   [ROB_PTR_W-1:0] second_idx;
     logic   [ROB_PTR_W-1:0] alloc_idx;
@@ -71,6 +90,14 @@ module i_fetch_ooo import rv32im_types::*; #(
     logic   [63:0]          queued_cnt;
     logic   [63:0]          rollback_cnt;
     logic   [63:0]          rollback_order;
+    logic   [ROB_PTR_W-1:0] pred_second_idx;
+    logic   [1:0]           pred_ready;
+    logic   [1:0]           pred_valid;
+    logic   [1:0]           pred_taken;
+    logic   [31:0]          pred_inst_0;
+    logic   [31:0]          pred_inst_1;
+    logic   [31:0]          pred_pc_0;
+    logic   [31:0]          pred_pc_1;
 
     function automatic logic [ROB_PTR_W-1:0] ptr_add(
         input logic [ROB_PTR_W-1:0] ptr,
@@ -87,27 +114,68 @@ module i_fetch_ooo import rv32im_types::*; #(
         end
     endfunction
 
-    function automatic logic is_jal(input logic [31:0] inst);
-        is_jal = (inst[6:0] == op_b_jal);
-    endfunction
-
-    function automatic logic [31:0] jal_target(
-        input logic [31:0] pc,
-        input logic [31:0] inst
-    );
-        logic [31:0] imm;
-        begin
-            imm = {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
-            jal_target = pc + imm;
-        end
-    endfunction
-
     always_comb begin
         resp[0] = resp_0;
         resp[1] = resp_1;
         rdata[0] = rdata_0;
         rdata[1] = rdata_1;
     end
+
+    assign pred_second_idx = ptr_add(rob_head_q, 2'd1);
+    always_comb begin
+        pred_ready[0] = rob_ready_q[rob_head_q];
+        pred_ready[1] = rob_ready_q[pred_second_idx];
+        pred_inst_0 = rob_inst_q[rob_head_q];
+        pred_inst_1 = rob_inst_q[pred_second_idx];
+
+        for (integer unsigned p = 0; p < 2; p = p + 1) begin
+            if (port_busy_q[p] && resp[p] && !port_kill_q[p]) begin
+                if (port_rob_idx_q[p] == rob_head_q) begin
+                    pred_ready[0] = 1'b1;
+                    pred_inst_0 = rdata[p];
+                end
+
+                if (port_rob_idx_q[p] == pred_second_idx) begin
+                    pred_ready[1] = 1'b1;
+                    pred_inst_1 = rdata[p];
+                end
+            end
+        end
+    end
+
+    assign pred_valid[0] = !flush && (rob_count_q != '0) &&
+                           rob_valid_q[rob_head_q] && pred_ready[0] &&
+                           (queue_left != QUEUE_COUNT_WIDTH'(0));
+    assign pred_valid[1] = (FETCH_WIDTH > 1) && !flush &&
+                           (rob_count_q >= ROB_CNT_W'(2)) &&
+                           rob_valid_q[pred_second_idx] && pred_ready[1] &&
+                           (queue_left >= QUEUE_COUNT_WIDTH'(2));
+
+    br_pred #(
+        .PHT_ENTRIES(BP_PHT_ENTRIES),
+        .RAS_ENTRIES(BP_RAS_ENTRIES)
+    ) bp (
+        .clk(clk),
+        .rst(rst),
+        .predecode_valid_0(pred_valid[0]),
+        .predecode_valid_1(pred_valid[1]),
+        .predecode_inst_0(pred_inst_0),
+        .predecode_inst_1(pred_inst_1),
+        .predecode_flush(flush || redirect),
+        .pc_0(rob_pc_q[rob_head_q]),
+        .pc_1(rob_pc_q[pred_second_idx]),
+        .update_valid(bp_update_valid),
+        .update_pc(bp_update_pc),
+        .update_is_cond_branch(bp_update_is_cond_branch),
+        .update_is_jalr(bp_update_is_jalr),
+        .update_is_call(bp_update_is_call),
+        .update_is_return(bp_update_is_return),
+        .update_taken(bp_update_taken),
+        .update_target(bp_update_target),
+        .taken(pred_taken),
+        .jump_pc_0(pred_pc_0),
+        .jump_pc_1(pred_pc_1)
+    );
 
     always_comb begin
         next_pc_n = next_pc_q;
@@ -130,8 +198,6 @@ module i_fetch_ooo import rv32im_types::*; #(
         for (integer unsigned p = 0; p < 2; p = p + 1) begin
             port_addr_n[p] = port_addr_q[p];
             port_rob_idx_n[p] = port_rob_idx_q[p];
-            issue[p] = 1'b0;
-            issue_addr[p] = 32'b0;
         end
 
         push_mask = 2'b00;
@@ -187,35 +253,32 @@ module i_fetch_ooo import rv32im_types::*; #(
             head_idx = rob_head_n;
             second_idx = ptr_add(rob_head_n, 2'd1);
 
-            if ((rob_count_n != '0) &&
-                rob_valid_n[head_idx] &&
-                rob_ready_n[head_idx] &&
-                (queue_left != 4'd0)) begin
+            if (pred_valid[0]) begin
                 push_mask[0] = 1'b1;
-                push_data_0.pc = rob_pc_n[head_idx];
-                push_data_0.inst = rob_inst_n[head_idx];
-                push_data_0.rvfi_order = rob_order_n[head_idx];
+                push_data_0.pc = rob_pc_q[head_idx];
+                push_data_0.inst = pred_inst_0;
+                push_data_0.rvfi_order = rob_order_q[head_idx];
+                push_data_0.pred_taken = pred_taken[0];
+                push_data_0.pred_pc = pred_pc_0;
                 pop_cnt = 2'd1;
 
-                if (is_jal(rob_inst_n[head_idx])) begin
+                if (pred_taken[0]) begin
                     redirect = 1'b1;
-                    redirect_pc = jal_target(rob_pc_n[head_idx], rob_inst_n[head_idx]);
-                    redirect_order = rob_order_n[head_idx] + 64'd1;
-                end else if ((rob_count_n >= ROB_CNT_W'(2)) &&
-                             rob_valid_n[second_idx] &&
-                             rob_ready_n[second_idx] &&
-                             (queue_left >= 4'd2)) begin
+                    redirect_pc = pred_pc_0;
+                    redirect_order = rob_order_q[head_idx] + 64'd1;
+                end else if (pred_valid[1]) begin
                     push_mask[1] = 1'b1;
-                    push_data_1.pc = rob_pc_n[second_idx];
-                    push_data_1.inst = rob_inst_n[second_idx];
-                    push_data_1.rvfi_order = rob_order_n[second_idx];
+                    push_data_1.pc = rob_pc_q[second_idx];
+                    push_data_1.inst = pred_inst_1;
+                    push_data_1.rvfi_order = rob_order_q[second_idx];
+                    push_data_1.pred_taken = pred_taken[1];
+                    push_data_1.pred_pc = pred_pc_1;
                     pop_cnt = 2'd2;
 
-                    if (is_jal(rob_inst_n[second_idx])) begin
+                    if (pred_taken[1]) begin
                         redirect = 1'b1;
-                        redirect_pc = jal_target(rob_pc_n[second_idx],
-                                                 rob_inst_n[second_idx]);
-                        redirect_order = rob_order_n[second_idx] + 64'd1;
+                        redirect_pc = pred_pc_1;
+                        redirect_order = rob_order_q[second_idx] + 64'd1;
                     end
                 end
             end
@@ -258,10 +321,8 @@ module i_fetch_ooo import rv32im_types::*; #(
         issue_order_cursor = next_order_n;
 
         for (integer unsigned p = 0; p < 2; p = p + 1) begin
-            if (!port_busy_q[p] && (rob_space != '0)) begin
+            if ((p < FETCH_WIDTH) && !port_busy_q[p] && (rob_space != '0)) begin
                 alloc_idx = rob_tail_n;
-                issue[p] = 1'b1;
-                issue_addr[p] = issue_pc_cursor;
 
                 rob_valid_n[alloc_idx] = 1'b1;
                 rob_ready_n[alloc_idx] = 1'b0;
@@ -298,7 +359,7 @@ module i_fetch_ooo import rv32im_types::*; #(
             rmask_0 = 4'hf;
         end
 
-        if (port_busy_q[1]) begin
+        if ((FETCH_WIDTH > 1) && port_busy_q[1]) begin
             addr_1 = port_addr_q[1];
             rmask_1 = 4'hf;
         end

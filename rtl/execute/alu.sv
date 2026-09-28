@@ -17,18 +17,16 @@
 2. load / store 地址生成
 3. mul / div
 */
-module alu
-import rv32im_types::*;
-(
+module alu (
     input   logic       clk,
     input   logic       rst,
     input   logic       flush,
 
     input   logic           issue_valid,
-    input   simple_issue_t  issue_data,
+    input   rv32im_types::simple_issue_t issue_data,
     output  logic           issue_ready,
 
-    output  wb_bus_t    wb_data,
+    output  rv32im_types::wb_bus_t wb_data,
     input   logic       wb_grant
 );
 
@@ -40,7 +38,7 @@ import rv32im_types::*;
     logic signed   [31:0] as, bs;
     logic unsigned [31:0] au, bu;
 
-    wb_bus_t wb_buf_q, wb_buf_d;
+    rv32im_types::wb_bus_t wb_buf_q, wb_buf_d;
 
     assign a  = issue_data.value_1;
     assign b  = issue_data.value_2;
@@ -54,37 +52,37 @@ import rv32im_types::*;
         op_supported = 1'b1;
 
         unique case (issue_data.op)
-            OP_ADD,
-            OP_ADDI,
-            OP_AUIPC: result = au + bu;
+            rv32im_types::OP_ADD,
+            rv32im_types::OP_ADDI,
+            rv32im_types::OP_AUIPC: result = au + bu;
 
-            OP_SUB: result = au - bu;
+            rv32im_types::OP_SUB: result = au - bu;
 
-            OP_XOR,
-            OP_XORI: result = au ^ bu;
+            rv32im_types::OP_XOR,
+            rv32im_types::OP_XORI: result = au ^ bu;
 
-            OP_OR,
-            OP_ORI: result = au | bu;
+            rv32im_types::OP_OR,
+            rv32im_types::OP_ORI: result = au | bu;
 
-            OP_AND,
-            OP_ANDI: result = au & bu;
+            rv32im_types::OP_AND,
+            rv32im_types::OP_ANDI: result = au & bu;
 
-            OP_SLL,
-            OP_SLLI: result = au << bu[4:0];
+            rv32im_types::OP_SLL,
+            rv32im_types::OP_SLLI: result = au << bu[4:0];
 
-            OP_SRL,
-            OP_SRLI: result = au >> bu[4:0];
+            rv32im_types::OP_SRL,
+            rv32im_types::OP_SRLI: result = au >> bu[4:0];
 
-            OP_SRA,
-            OP_SRAI: result = unsigned'(as >>> bu[4:0]);
+            rv32im_types::OP_SRA,
+            rv32im_types::OP_SRAI: result = unsigned'(as >>> bu[4:0]);
 
-            OP_SLT,
-            OP_SLTI: result = {31'd0, (as < bs)};
+            rv32im_types::OP_SLT,
+            rv32im_types::OP_SLTI: result = {31'd0, (as < bs)};
 
-            OP_SLTU,
-            OP_SLTIU: result = {31'd0, (au < bu)};
+            rv32im_types::OP_SLTU,
+            rv32im_types::OP_SLTIU: result = {31'd0, (au < bu)};
 
-            OP_LUI: result = b;
+            rv32im_types::OP_LUI: result = b;
 
             default: begin
                 result = '0;
